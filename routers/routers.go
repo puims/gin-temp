@@ -2,7 +2,6 @@ package routers
 
 import (
 	"gin-temp/controllers"
-	"gin-temp/middlewares"
 
 	"github.com/gin-gonic/gin"
 )
@@ -10,7 +9,7 @@ import (
 func App() (app *gin.Engine) {
 	app = gin.Default()
 
-	app.Use(middlewares.MiddleWare())
+	// app.Use(middlewares.MiddleWare())
 
 	app.GET("/", func(c *gin.Context) {
 		c.String(200, "home page")

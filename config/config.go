@@ -3,24 +3,33 @@ package config
 import (
 	"fmt"
 	"os"
-	// "github.com/spf13/viper"
+	"path/filepath"
+
+	"github.com/spf13/viper"
 )
 
-// var Config = viper.New()
+var Viper = viper.New()
 
 func init() {
-
 	cfgFiles, err := getCfgFiles()
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
-	fmt.Println(cfgFiles)
 
+	Viper.AddConfigPath("./config")
+	Viper.SetConfigType("yaml")
 	/*
 		Traverses the configuration file and reads the contents of the file
 		遍历配置文件，并读取文件内容
 	*/
+	for _, file := range cfgFiles {
+		Viper.SetConfigName(file)
+		if err := Viper.MergeInConfig(); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
 
 }
 
@@ -32,17 +41,17 @@ func getCfgFiles() (cfgFiles []string, err error) {
 	*/
 	f, err := os.Open("./config")
 	if err != nil {
-		return nil, err
+		return
 	}
 	defer f.Close()
 
 	files, err := f.ReadDir(-1)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	for _, file := range files {
-		if file.Name()[len(file.Name())-5:] == ".yaml" {
+		if filepath.Ext(file.Name()) == ".yaml" {
 			cfgFiles = append(cfgFiles, file.Name())
 		}
 	}

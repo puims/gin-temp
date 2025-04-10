@@ -1,12 +1,22 @@
 package controllers
 
-import "github.com/gin-gonic/gin"
+import (
+	"gin-temp/models"
+
+	"github.com/gin-gonic/gin"
+)
 
 func GetAllUsers(c *gin.Context) {
-	c.String(200, "user page: get all users")
+	var users []models.UserInfo
+	models.DB.Find(&users)
+
+	c.JSON(200, users)
 }
 
 func GetUserById(c *gin.Context) {
 	id := c.Param("id")
-	c.String(200, "get user by id:"+id)
+	var user models.UserInfo
+	models.DB.Where("id = ?", id).First(&user)
+
+	c.JSON(200, user)
 }
