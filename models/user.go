@@ -4,20 +4,10 @@ import "gorm.io/gorm"
 
 type UserInfo struct {
 	gorm.Model
-	Name          string `gorm:"type:varchar(20)"`
-	Password      string
-	Phone         string
-	Email         string
-	Identity      string
-	HeartBeatTime uint64
-	ClientIP      string
-	ClientPort    string
-	LoginTime     uint64
-	LogoutTime    uint64
-	IsLogout      bool
-	DeviceInfo    string
+	Name     string `form:"username" gorm:"type:varchar(20);unique;not null"`
+	Password string `form:"password"`
 }
 
-func (table *UserInfo) TableName() string {
+func (UserInfo) TableName() string {
 	return "users"
 }
