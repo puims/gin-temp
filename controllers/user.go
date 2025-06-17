@@ -54,11 +54,10 @@ func UpdateUser(ctx *gin.Context) {
 		return
 	}
 
-	user = models.UserInfo{
-		Name:     ctx.PostForm("username"),
-		Password: ctx.PostForm("password"),
-	}
-	models.DB.Update(&user)
+	user.Name = ctx.PostForm("username")
+	user.Password = ctx.PostForm("password")
+
+	models.DB.Save(&user)
 
 	ctx.JSON(200, gin.H{
 		"user": user,
