@@ -10,7 +10,7 @@ import (
 	"github.com/storyicon/grbac"
 )
 
-func Authorization() gin.HandlerFunc {
+func AuthorizationRabc() gin.HandlerFunc {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
@@ -39,5 +39,6 @@ func Authorization() gin.HandlerFunc {
 }
 
 func QueryRolesByHeaders(header http.Header) (roles []string, err error) {
+
 	return
 }

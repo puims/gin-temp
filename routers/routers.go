@@ -13,19 +13,32 @@ func App() (app *gin.Engine) {
 	app = gin.Default()
 
 	initLog()
-	app.Use(middlewares.MiddleWare())
 
-	app.GET("/", func(c *gin.Context) {
-		c.String(200, "home page\n")
+	app.GET("/", func(ctx *gin.Context) {
+		ctx.String(200, "home page\n")
 	})
+	app.POST("/register", controllers.CreateUser)
+	app.POST("/login", controllers.Login)
 
-	r1 := app.Group("users", middlewares.Authorization())
+	r1 := app.Group("users",
+		middlewares.Authorization,
+		// middlewares.ProHandler,
+	)
 	{
 		r1.GET("/", controllers.GetAllUsers)
 		r1.GET("/:id", controllers.GetUserById)
-		r1.POST("/", controllers.CreateUser)
-		r1.PUT("/:id", controllers.UpdateUser)
-		r1.DELETE("/:id", controllers.DeleteUser)
+
+		r1.PUT("/modify/:id", controllers.UpdateUser)
+		r1.DELETE("/delete/:id", controllers.DeleteUser)
+	}
+
+	r2 := app.Group("articles")
+	{
+		r2.GET("/", func(ctx *gin.Context) {
+			ctx.JSON(200, gin.H{
+				"msg": "article page",
+			})
+		})
 	}
 
 	return

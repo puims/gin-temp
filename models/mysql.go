@@ -18,11 +18,11 @@ func init() {
 	user := config.Viper.GetString("mysql.user")
 	pwd := config.Viper.GetString("mysql.password")
 	host := config.Viper.GetString("mysql.host")
-	port := config.Viper.GetString("mysql.port")
+	port := config.Viper.GetInt("mysql.port")
 	dbname := config.Viper.GetString("mysql.db")
 
 	sqlUri := fmt.Sprintf(
-		"%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		"%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		user, pwd, host, port, dbname,
 	)
 

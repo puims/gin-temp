@@ -1,10 +1,14 @@
 package controllers
 
 import (
+	"gin-temp/middlewares"
 	"gin-temp/models"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
+
+var userFoundError = gin.H{"Error": "User not found"}
 
 func GetAllUsers(ctx *gin.Context) {
 	var users []models.UserInfo
@@ -19,9 +23,7 @@ func GetUserById(ctx *gin.Context) {
 	models.DB.Where("id = ?", id).First(&user)
 
 	if user.ID == 0 {
-		ctx.JSON(200, gin.H{
-			"Error": "User not found",
-		})
+		ctx.JSON(200, userFoundError)
 		return
 	}
 	ctx.JSON(200, user)
@@ -30,6 +32,7 @@ func GetUserById(ctx *gin.Context) {
 func CreateUser(ctx *gin.Context) {
 	username := ctx.PostForm("username")
 	password := ctx.PostForm("password")
+	password, _ = HashPassword(password)
 
 	user := models.UserInfo{
 		Name:     username,
@@ -48,14 +51,15 @@ func UpdateUser(ctx *gin.Context) {
 	models.DB.Where("id = ?", id).First(&user)
 
 	if user.ID == 0 {
-		ctx.JSON(200, gin.H{
-			"Error": "User not found",
-		})
+		ctx.JSON(200, userFoundError)
 		return
 	}
 
+	password := ctx.PostForm("password")
+	password, _ = HashPassword(password)
+
 	user.Name = ctx.PostForm("username")
-	user.Password = ctx.PostForm("password")
+	user.Password = password
 
 	models.DB.Save(&user)
 
@@ -70,14 +74,40 @@ func DeleteUser(ctx *gin.Context) {
 	models.DB.Where("id = ?", id).First(&user)
 
 	if user.ID == 0 {
-		ctx.JSON(200, gin.H{
-			"Error": "User not found",
-		})
+		ctx.JSON(200, userFoundError)
 		return
 	}
 
 	models.DB.Delete(&user)
 	ctx.JSON(200, gin.H{
-		"msg": "OK",
+		"status": "OK",
 	})
+}
+
+func Login(ctx *gin.Context) {
+	username := ctx.PostForm("username")
+	password := ctx.PostForm("password")
+
+	user := models.UserInfo{}
+	models.DB.Where("name = ?", username).First(&user)
+	if user.ID == 0 {
+		ctx.JSON(200, userFoundError)
+		return
+	}
+
+	state, err := VerifyPassword(password, user.Password)
+	if err != nil {
+		ctx.JSON(200, gin.H{
+			"state": state,
+			"error": err,
+		})
+		return
+	}
+
+	token, err := middlewares.NewToken(user.Name)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, token)
+	} else {
+		ctx.JSON(200, token)
+	}
 }
