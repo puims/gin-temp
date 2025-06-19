@@ -3,6 +3,7 @@ package routers
 import (
 	"gin-temp/controllers"
 	"gin-temp/middlewares"
+	"gin-temp/models"
 	"io"
 	"os"
 
@@ -14,29 +15,36 @@ func App() (app *gin.Engine) {
 
 	initLog()
 
-	app.GET("/", func(ctx *gin.Context) {
-		ctx.String(200, "home page\n")
-	})
-	app.POST("/register", controllers.CreateUser)
-	app.POST("/login", controllers.Login)
+	authController := controllers.AuthController{DB: models.DB}
+	userController := controllers.UserController{DB: models.DB}
 
-	r1 := app.Group("users",
-		middlewares.Authorization,
-		// middlewares.ProHandler,
-	)
 	{
-		r1.GET("/", controllers.GetAllUsers)
-		r1.GET("/:id", controllers.GetUserById)
-
-		r1.PUT("/modify/:id", controllers.UpdateUser)
-		r1.DELETE("/delete/:id", controllers.DeleteUser)
+		app.GET("/",
+			func(ctx *gin.Context) { ctx.JSON(200, "home page") },
+		)
+		app.POST("/register", authController.Register)
+		app.POST("/login", authController.Login)
 	}
 
-	r2 := app.Group("articles")
+	r1 := app.Group("/users")
+	r1.Use(middlewares.Authorization())
+	{
+		r1.GET("/", userController.GetAllUsers)
+		r1.GET("/:id", userController.GetUserById)
+
+		r1.PUT("/modify/", userController.UpdateUser)
+		r1.DELETE("/delete/:id", userController.DeleteUser)
+	}
+
+	r2 := app.Group("/admin")
+	r2.Use(
+		middlewares.Authorization(),
+		middlewares.RoleMidware([]string{"admin", "edtior"}),
+	)
 	{
 		r2.GET("/", func(ctx *gin.Context) {
 			ctx.JSON(200, gin.H{
-				"msg": "article page",
+				"msg": "admin page",
 			})
 		})
 	}

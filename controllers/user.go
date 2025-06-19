@@ -1,113 +1,93 @@
 package controllers
 
 import (
-	"gin-temp/middlewares"
+	"fmt"
 	"gin-temp/models"
+	"gin-temp/utils"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jinzhu/gorm"
 )
 
-var userFoundError = gin.H{"Error": "User not found"}
+type UserController struct {
+	DB *gorm.DB
+}
 
-func GetAllUsers(ctx *gin.Context) {
-	var users []models.UserInfo
-	models.DB.Find(&users)
+func (uc *UserController) GetAllUsers(ctx *gin.Context) {
+	var users []models.User
+	uc.DB.Find(&users)
 
 	ctx.JSON(200, users)
 }
 
-func GetUserById(ctx *gin.Context) {
+func (uc *UserController) GetUserById(ctx *gin.Context) {
 	id := ctx.Param("id")
-	var user models.UserInfo
-	models.DB.Where("id = ?", id).First(&user)
+	var user models.User
+	uc.DB.Where("id = ?", id).First(&user)
 
 	if user.ID == 0 {
-		ctx.JSON(200, userFoundError)
+		ctx.JSON(200, gin.H{"error": "User not found"})
 		return
 	}
 	ctx.JSON(200, user)
 }
 
-func CreateUser(ctx *gin.Context) {
-	username := ctx.PostForm("username")
-	password := ctx.PostForm("password")
-	password, _ = HashPassword(password)
-
-	user := models.UserInfo{
-		Name:     username,
-		Password: password,
-	}
-	models.DB.Create(&user)
-
-	ctx.JSON(200, gin.H{
-		"user": user,
-	})
-}
-
-func UpdateUser(ctx *gin.Context) {
-	id := ctx.Param("id")
-	user := models.UserInfo{}
-	models.DB.Where("id = ?", id).First(&user)
-
-	if user.ID == 0 {
-		ctx.JSON(200, userFoundError)
+func (uc *UserController) UpdateUser(ctx *gin.Context) {
+	userIn := models.UserLogin{}
+	if err := ctx.ShouldBindJSON(&userIn); err != nil {
+		ctx.JSON(403, gin.H{"error": err.Error()})
 		return
 	}
 
-	password := ctx.PostForm("password")
-	password, _ = HashPassword(password)
-
-	user.Name = ctx.PostForm("username")
-	user.Password = password
-
-	models.DB.Save(&user)
-
-	ctx.JSON(200, gin.H{
-		"user": user,
-	})
-}
-
-func DeleteUser(ctx *gin.Context) {
-	id := ctx.Param("id")
-	user := models.UserInfo{}
-	models.DB.Where("id = ?", id).First(&user)
-
-	if user.ID == 0 {
-		ctx.JSON(200, userFoundError)
+	claims, exists := ctx.Get("claims")
+	if !exists {
+		ctx.JSON(401, gin.H{"error": "User not authenticated"})
 		return
 	}
 
-	models.DB.Delete(&user)
-	ctx.JSON(200, gin.H{
-		"status": "OK",
-	})
-}
-
-func Login(ctx *gin.Context) {
-	username := ctx.PostForm("username")
-	password := ctx.PostForm("password")
-
-	user := models.UserInfo{}
-	models.DB.Where("name = ?", username).First(&user)
-	if user.ID == 0 {
-		ctx.JSON(200, userFoundError)
+	user := models.User{}
+	if err := uc.DB.Where("id = ?", claims.(*utils.Claims).ID).First(&user).Error; err != nil {
+		ctx.JSON(200, gin.H{"error": "Failed to search user from database"})
 		return
 	}
 
-	state, err := VerifyPassword(password, user.Password)
+	hashPwd, err := utils.HashPassword(userIn.Password)
 	if err != nil {
-		ctx.JSON(200, gin.H{
-			"state": state,
-			"error": err,
-		})
+		ctx.JSON(403, gin.H{"error": "Failed to hash password"})
 		return
 	}
 
-	token, err := middlewares.NewToken(user.Name)
-	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, token)
-	} else {
-		ctx.JSON(200, token)
+	user.Username = userIn.Username
+	user.Password = hashPwd
+
+	if err := models.DB.Save(&user).Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError,
+			gin.H{"error": "Failed to save data to database"})
+		return
 	}
+
+	ctx.JSON(200, user)
+}
+
+func (uc *UserController) DeleteUser(ctx *gin.Context) {
+	id := ctx.Param("id")
+	user := models.User{}
+
+	err := models.DB.Where("id = ?", id).First(&user).Error
+	if err != nil {
+		ctx.JSON(403, gin.H{"error": "User not found"})
+		return
+	}
+
+	err = models.DB.Delete(&user).Error
+	if err != nil {
+		ctx.JSON(403, gin.H{"error": "Failed to delete user"})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"state": true,
+		"msg":   fmt.Sprintf("User %s has deleted", user.Username),
+	})
 }

@@ -1,4 +1,4 @@
-package middlewares
+package utils
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ func AuthorizationRabc() gin.HandlerFunc {
 	}
 
 	return func(ctx *gin.Context) {
-		roles, err := QueryRolesByHeaders(ctx.Request.Header)
+		roles, err := QueryRolesByHeaders(ctx)
 		if err != nil {
 			ctx.AbortWithError(http.StatusInternalServerError, err)
 			return
@@ -38,7 +38,19 @@ func AuthorizationRabc() gin.HandlerFunc {
 	}
 }
 
-func QueryRolesByHeaders(header http.Header) (roles []string, err error) {
+func QueryRolesByHeaders(ctx *gin.Context) (roles []string, err error) {
+	// token, err := getToken(ctx)
+	// if err != nil {
+	// 	ctx.JSON(401, gin.H{"error": "authorization header required"})
+	// 	ctx.Abort()
+	// 	return
+	// }
+
+	// claims, exists := ctx.Get("claims")
+	// if !exists {
+	// 	ctx.JSON(401, gin.H{"error": "claims not found"})
+	// 	return
+	// }
 
 	return
 }

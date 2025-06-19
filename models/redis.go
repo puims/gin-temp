@@ -30,3 +30,16 @@ func init() {
 		panic(err)
 	}
 }
+
+func StoreToken(uid uint, token string) error {
+	ctx := context.Background()
+	expires := 1 * time.Hour
+	return Redis.Set(ctx, fmt.Sprintf("user:%d:token", uid), token, expires).Err()
+}
+
+func VerifyToken(uid uint, token string) bool {
+	ctx := context.Background()
+	storeToken, err := Redis.Get(ctx, fmt.Sprintf("user:%d:token", uid)).Result()
+
+	return err == nil && storeToken == token
+}

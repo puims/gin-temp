@@ -31,8 +31,7 @@ func init() {
 		panic("failed to connect mysql...")
 	}
 
-	// 数据自动迁移
-	DB.AutoMigrate(&UserInfo{})
+	DB.AutoMigrate(&User{})
 
 	DB.DB().SetMaxOpenConns(100)
 	DB.DB().SetMaxIdleConns(10)
