@@ -12,9 +12,9 @@ import (
 var jwtKey = []byte("happydays")
 
 type Claims struct {
-	ID       uint   `json:"uid"`
-	Username string `json:"username"`
-	Role     string `json:"role"`
+	ID       uint          `json:"uid"`
+	Username string        `json:"username"`
+	Roles    []models.Role `json:"roles"`
 	jwt.RegisteredClaims
 }
 
@@ -23,7 +23,7 @@ func GenerateToken(user *models.User) (gin.H, error) {
 	claims := &Claims{
 		ID:       user.ID,
 		Username: user.Username,
-		Role:     user.Role,
+		Roles:    user.Roles,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expTime),
 			Issuer:    "gin-app",

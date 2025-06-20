@@ -1,8 +1,10 @@
 package routers
 
 import (
+	"fmt"
+	"gin-temp/config"
 	"gin-temp/controllers"
-	"gin-temp/middlewares"
+	"gin-temp/middleware"
 	"gin-temp/models"
 	"io"
 	"os"
@@ -10,46 +12,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func App() (app *gin.Engine) {
-	app = gin.Default()
+var App *gin.Engine
 
+func init() {
 	initLog()
+	initEnv()
+
+	App = gin.Default()
 
 	authController := controllers.AuthController{DB: models.DB}
 	userController := controllers.UserController{DB: models.DB}
 
 	{
-		app.GET("/",
-			func(ctx *gin.Context) { ctx.JSON(200, "home page") },
+		App.GET("/",
+			func(ctx *gin.Context) {
+				ctx.JSON(200,
+					fmt.Sprintf("%s home page", config.Viper.GetString("app.name")))
+			},
 		)
-		app.POST("/register", authController.Register)
-		app.POST("/login", authController.Login)
+		App.POST("/register", authController.Register)
+		App.POST("/login", authController.Login)
 	}
 
-	r1 := app.Group("/users")
-	r1.Use(middlewares.Authorization())
-	{
-		r1.GET("/", userController.GetAllUsers)
-		r1.GET("/:id", userController.GetUserById)
-
-		r1.PUT("/modify/", userController.UpdateUser)
-		r1.DELETE("/delete/:id", userController.DeleteUser)
-	}
-
-	r2 := app.Group("/admin")
-	r2.Use(
-		middlewares.Authorization(),
-		middlewares.RoleMidware([]string{"admin", "edtior"}),
+	r1 := App.Group(
+		"/users",
+		middleware.Authorization(),
 	)
 	{
-		r2.GET("/", func(ctx *gin.Context) {
-			ctx.JSON(200, gin.H{
-				"msg": "admin page",
-			})
-		})
+		r1.PUT("/modify/", userController.UpdateUser)
 	}
 
-	return
+	r2 := App.Group(
+		"/admin",
+		middleware.Authorization(),
+		middleware.RoleMidware([]string{"admin"}),
+	)
+	{
+		r2.GET("/", userController.GetAllUsers)
+		r2.GET("/:id", userController.GetUserById)
+		r2.PUT("/modify/", userController.UpdateUser)
+		r2.DELETE("/delete/:id", userController.DeleteUser)
+	}
 }
 
 func initLog() {
@@ -57,4 +60,10 @@ func initLog() {
 
 	f, _ := os.Create("gin.log")
 	gin.DefaultWriter = io.MultiWriter(f)
+}
+
+func initEnv() {
+	if appMode := config.Viper.GetBool("app.debug"); !appMode {
+		gin.SetMode(gin.ReleaseMode)
+	}
 }

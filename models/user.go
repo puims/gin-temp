@@ -7,7 +7,13 @@ type User struct {
 	Username string `gorm:"type:varchar(20);uniqueIndex:idx_username_deleted"`
 	Password string
 	Email    string `gorm:"type:varchar(100);uniqueIndex:idx_email_deleted"`
-	Role     string `gorm:"default:'user'"`
+	Roles    []Role `gorm:"many2many:user_roles"`
+}
+
+type Role struct {
+	gorm.Model
+	Name  string `gorm:"type:varchar(20);unique;not null"`
+	Users []User `gorm:"many2many:user_roles"`
 }
 
 func (User) Indexes(db *gorm.DB) error {
@@ -35,4 +41,11 @@ type UserRegister struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
 	Email    string `json:"email" binding:"required"`
+}
+
+type UserProfile struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	Email    string `json:"email" binding:"required"`
+	AdminKey string `json:"adminkey"`
 }

@@ -38,9 +38,17 @@ func (ac *AuthController) Register(ctx *gin.Context) {
 		return
 	}
 
+	role := models.Role{}
+	if err := ac.DB.First(&role, "name = ?", "user").Error; err != nil {
+		ctx.JSON(http.StatusInternalServerError,
+			gin.H{"error": "Failed to find role.name:user"})
+		return
+	}
+
 	user.Username = userIn.Username
 	user.Password = hashPwd
 	user.Email = userIn.Email
+	user.Roles = []models.Role{role}
 
 	if err := ac.DB.Create(&user).Error; err != nil {
 		ctx.JSON(http.StatusInternalServerError,
@@ -58,7 +66,7 @@ func (ac *AuthController) Login(ctx *gin.Context) {
 	}
 
 	user := models.User{}
-	if err := ac.DB.Where("username = ?", userIn.Username).First(&user).
+	if err := ac.DB.Preload("Roles").First(&user, "username = ?", userIn.Username).
 		Error; err != nil {
 		ctx.JSON(http.StatusUnauthorized,
 			gin.H{"error": "Invalid credentials"})

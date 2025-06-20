@@ -16,9 +16,8 @@ func AuthorizationRabc() gin.HandlerFunc {
 		panic(err)
 	}
 
-	rbac, err := grbac.New(
-		grbac.WithYAML(fmt.Sprintf("%s/.gin-rbac", home), 10*time.Minute),
-	)
+	rbac, err := grbac.New(grbac.WithYAML(fmt.Sprintf("%s/.gin-rbac", home),
+		10*time.Minute))
 	if err != nil {
 		panic(err)
 	}

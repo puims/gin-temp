@@ -3,6 +3,7 @@ package models
 import (
 	"fmt"
 	"gin-temp/config"
+	"log"
 	"time"
 
 	"github.com/jinzhu/gorm"
@@ -31,9 +32,25 @@ func init() {
 		panic("failed to connect mysql...")
 	}
 
-	DB.AutoMigrate(&User{})
+	err = DB.AutoMigrate(&User{}, &Role{}).Error
+	if err != nil {
+		panic(err)
+	}
 
 	DB.DB().SetMaxOpenConns(100)
 	DB.DB().SetMaxIdleConns(10)
 	DB.DB().SetConnMaxLifetime(10 * time.Second)
+
+	initRoleTable()
+}
+
+func initRoleTable() {
+	roleList := []string{"guest", "user", "admin"}
+
+	for _, role := range roleList {
+		err := DB.FirstOrCreate(&Role{Name: role}).Error
+		if err != nil {
+			log.Println(err)
+		}
+	}
 }

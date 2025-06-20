@@ -8,6 +8,6 @@ import (
 func main() {
 	defer models.DB.Close()
 
-	routers.App().Run(":8080")
+	routers.App.Run(":8080")
 
 }
