@@ -25,5 +25,5 @@ func initLog() {
 		log.Fatalf("Failed to create log file: %v", err)
 	}
 
-	gin.DefaultWriter = io.MultiWriter(f, os.Stdout) // 同时输出到文件和控制台
+	gin.DefaultWriter = io.MultiWriter(f)
 }

@@ -10,14 +10,17 @@ import (
 
 func JwtAuthorization() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		var token string
+
 		authHeader := ctx.GetHeader("Authorization")
 		if authHeader[:7] == "Bearer " {
+			token = authHeader[7:]
+		} else {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "failed to get token from header",
 			})
 			return
 		}
-		token := authHeader[7:]
 
 		claims, err := utils.ParseToken(token)
 		if err != nil {
@@ -25,17 +28,12 @@ func JwtAuthorization() gin.HandlerFunc {
 			return
 		}
 
-		// if !models.VerifyToken(claims.ID, token) {
-		// 	ctx.AbortWithStatusJSON(401, gin.H{"error": "Token expired or invalid"})
-		// 	return
-		// }
-
 		ctx.Set("claims", claims)
 		ctx.Next()
 	}
 }
 
-func CasbinAuthorization(enforer *casbin.Enforcer) gin.HandlerFunc {
+func CasbinAuthorization(enforcer *casbin.Enforcer) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		// 获取请求的URI
 		obj := ctx.Request.URL.RequestURI()
@@ -51,7 +49,7 @@ func CasbinAuthorization(enforer *casbin.Enforcer) gin.HandlerFunc {
 		roles := claims.(*utils.Claims).Roles
 		hasPermission := false
 		for _, rl := range roles {
-			ok, err := enforer.Enforce(rl.Name, obj, act)
+			ok, err := enforcer.Enforce(rl.Name, obj, act)
 			if err != nil {
 				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
 					"error": "Permission validation failed",

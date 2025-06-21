@@ -10,14 +10,11 @@ import (
 )
 
 func SetupApp() (*gin.Engine, *models.MysqlDB, *utils.CasbinPolicyLoader) {
-	// 初始化日志
 	initLog()
 
-	// 初始化Gin引擎
 	app := initApp()
 
-	// 初始化数据库
-	db, err := models.NewMysqlDB(&models.User{}, &models.Role{})
+	db, err := models.NewMysqlDB(&models.User{}, &models.Role{}, &models.UserRole{})
 	if err != nil {
 		panic(err)
 	}
@@ -27,14 +24,12 @@ func SetupApp() (*gin.Engine, *models.MysqlDB, *utils.CasbinPolicyLoader) {
 		log.Fatal("Failed to init casbin", err)
 	}
 
-	// 初始化控制器
-	authController := &controller.AuthController{DB: db}
-	adminController := &controller.AdminController{DB: db}
+	authCtrl := &controller.AuthController{DB: db}
+	adminCtrl := &controller.AdminController{DB: db}
 
-	// 设置路由
-	setupPublicRoutes(app, authController)
-	setupAdminRoutes(app, enforcer, adminController)
-	setupUserRoutes(app, enforcer, adminController)
+	setupPublicRoutes(app, authCtrl)
+	setupAdminRoutes(app, enforcer, adminCtrl)
+	setupUserRoutes(app, enforcer, adminCtrl)
 
 	return app, db, loader
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"io"
+	"log"
 	"os"
 
 	"github.com/spf13/viper"
@@ -16,16 +17,13 @@ func init() {
 }
 
 func initViper() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		panic(err)
-	}
+	confPath := getConfPath()
 
-	Viper.AddConfigPath(home)
+	Viper.AddConfigPath(confPath)
 	Viper.SetConfigType("yaml")
 	Viper.SetConfigName(".gin-temp")
 
-	err = Viper.ReadInConfig()
+	err := Viper.ReadInConfig()
 	if err != nil {
 		panic(err)
 	}
@@ -36,34 +34,40 @@ func initViper() {
 func generateFilesToHome() {
 	fileList, err := getFiles()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		return
+	}
+
+	confPath := getConfPath()
+	if _, err := os.Stat(confPath); !os.IsNotExist(err) {
+		if err := os.RemoveAll(confPath); err != nil {
+			log.Panicln(err)
+			return
+		}
+	}
+	if err := os.MkdirAll(confPath, 0755); err != nil {
+		log.Println(err)
 		return
 	}
 
 	for _, fileName := range fileList {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
 		src, err := os.Open(fmt.Sprintf("./config/%s", fileName))
 		if err != nil {
-			fmt.Print(err)
+			log.Print(err)
 			return
 		}
 		defer src.Close()
 
-		dst, err := os.Create(fmt.Sprintf("%s/%s", home, fileName))
+		dst, err := os.Create(fmt.Sprintf("%s/%s", confPath, fileName))
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 		defer dst.Close()
 
 		_, err = io.Copy(dst, src)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			return
 		}
 	}
@@ -82,4 +86,14 @@ func getFiles() (files []string, err error) {
 	}
 
 	return
+}
+
+func getConfPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Println(err)
+		return ""
+	}
+
+	return fmt.Sprintf("%s/.%s", home, "gin-temp")
 }

@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -129,12 +130,18 @@ func (ac *AdminController) UpdateUser(ctx *gin.Context) {
 		return
 	}
 
+	hashPwd, err := bcrypt.GenerateFromPassword([]byte(userIn.Password), bcrypt.DefaultCost)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to hash password"})
+		return
+	}
+
 	// 5. 更新用户信息(使用事务)
 	err = ac.DB.Transaction(func(tx *gorm.DB) error {
 		// 更新基本信息
 		user.Username = userIn.Username
 		user.Email = userIn.Email
-		user.Password = userIn.Password
+		user.Password = string(hashPwd)
 
 		if err := tx.Save(&user).Error; err != nil {
 			return err
@@ -182,7 +189,19 @@ func (ac *AdminController) UpdateUser(ctx *gin.Context) {
 		return
 	}
 
-	ctx.JSON(http.StatusOK, user)
+	userRoles := []string{}
+	for _, rl := range user.Roles {
+		userRoles = append(userRoles, rl.Name)
+	}
+
+	ctx.JSON(200, gin.H{
+		"id":         user.ID,
+		"username":   user.Username,
+		"created_at": user.CreatedAt,
+		"updated_at": user.UpdatedAt,
+		"email":      user.Email,
+		"roles":      userRoles,
+	})
 }
 
 // DeleteUser 删除用户

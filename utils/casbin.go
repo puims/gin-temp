@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"fmt"
+	"gin-temp/config"
 	"os"
 	"strings"
 	"time"
@@ -158,13 +159,12 @@ func SetupCasbin(db *gorm.DB) (*casbin.Enforcer, *CasbinPolicyLoader, error) {
 		return nil, nil, err
 	}
 
-	filePath := fmt.Sprintf("%s/.gin-rbac", home)
-	enforcer, err := casbin.NewEnforcer(filePath, adapter)
+	enforcer, err := casbin.NewEnforcer("config/rbac.env", adapter)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	loadPath := fmt.Sprintf("%s/.gin-policy", home)
+	loadPath := fmt.Sprintf("%s/.%s/.gin-policy", home, config.Viper.GetString("app.name"))
 	loader, err := NewPolicyLoader(enforcer, loadPath)
 	if err != nil {
 		return nil, nil, err

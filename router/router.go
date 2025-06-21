@@ -20,25 +20,25 @@ func setupPublicRoutes(app *gin.Engine, authCtrl *controller.AuthController) {
 
 func setupAdminRoutes(app *gin.Engine, enforcer *casbin.Enforcer, adminCtrl *controller.AdminController) {
 	r0 := app.Group(
-		"/admin/",
+		"/admin",
 		middleware.JwtAuthorization(),
 		middleware.CasbinAuthorization(enforcer),
 	)
 	{
-		r0.GET("/", adminCtrl.GetAllUsers)
+		r0.GET("", adminCtrl.GetAllUsers)
 		r0.GET("/:id", adminCtrl.GetUserById)
-		r0.PUT("/modify/", adminCtrl.UpdateUser)
+		r0.PUT("/modify", adminCtrl.UpdateUser)
 		r0.DELETE("/delete/:id", adminCtrl.DeleteUser)
 	}
 }
 
 func setupUserRoutes(app *gin.Engine, enforcer *casbin.Enforcer, adminCtrl *controller.AdminController) {
 	r1 := app.Group(
-		"/users/",
+		"/users",
 		middleware.JwtAuthorization(),
 		middleware.CasbinAuthorization(enforcer),
 	)
 	{
-		r1.PUT("/modify/", adminCtrl.UpdateUser)
+		r1.PUT("/modify", adminCtrl.UpdateUser)
 	}
 }

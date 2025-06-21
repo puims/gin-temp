@@ -41,8 +41,8 @@ func (ac *AuthController) Register(ctx *gin.Context) {
 		return
 	}
 
-	user := models.User{}
-	if err := ac.DB.First(&user, "username = ? OR email = ?", userIn.Username, userIn.Email).
+	queryUser := models.User{}
+	if err := ac.DB.First(&queryUser, "username = ? OR email = ?", userIn.Username, userIn.Email).
 		Error; err == nil {
 		ctx.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
 		return
@@ -51,12 +51,20 @@ func (ac *AuthController) Register(ctx *gin.Context) {
 		return
 	}
 
+	queryRole := models.Role{}
+	if err := ac.DB.First(&queryRole, "name = ?", "user").Error; err != nil {
+		ctx.JSON(http.StatusConflict, gin.H{"error": "Failed to query role"})
+		return
+	}
+
+	user := models.User{
+		Username: userIn.Username,
+		Password: userIn.Password,
+		Email:    userIn.Email,
+		Roles:    []models.Role{queryRole},
+	}
+
 	err := ac.DB.Transaction(func(tx *gorm.DB) error {
-		user := models.User{
-			Username: userIn.Username,
-			Password: userIn.Password,
-			Email:    userIn.Email,
-		}
 		if err := tx.Create(&user).Error; err != nil {
 			return err
 		}
@@ -84,7 +92,6 @@ func (ac *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	startTime := time.Now()
 	user := models.User{}
 	if err := ac.DB.Select("id", "username", "password", "email").
 		First(&user, "username = ?", userIn.Username).Error; err != nil {
@@ -124,11 +131,10 @@ func (ac *AuthController) Login(ctx *gin.Context) {
 		"token": token,
 		"user": gin.H{
 			"id":       user.ID,
-			"username": user.ID,
+			"username": user.Username,
 			"email":    user.Email,
 			"roles":    userRoles,
 		},
-		"response_time": time.Since(startTime).Milliseconds(),
 	})
 }
 

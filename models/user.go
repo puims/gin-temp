@@ -10,9 +10,9 @@ import (
 type User struct {
 	gorm.Model
 	Username string `gorm:"type:varchar(20);not null;index:idx_username,unique,where:deleted_at IS NULL"`
-	Password string `gorm:"type:varchar(255);not null"`
+	Password string `gorm:"type:varchar(255)"`
 	Email    string `gorm:"type:varchar(100);not null;index:idx_email,unique,where:deleted_at IS NULL"`
-	Roles    []Role `gorm:"many2many:user_roles;joinForeignKey:user_id;joinReferences:role_id"`
+	Roles    []Role `gorm:"many2many:user_roles;"`
 }
 
 func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
@@ -25,18 +25,6 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 		u.Password = string(hashed)
 		return nil
 	}
-
-	if len(u.Roles) == 0 {
-		var defaultRole Role
-		if err := tx.Where("name = ?", "user").First(&defaultRole).Error; err != nil {
-			defaultRole = Role{Name: "user"}
-			if err := tx.Create(&defaultRole).Error; err != nil {
-				return err
-			}
-		}
-		u.Roles = []Role{defaultRole}
-	}
-
 	return
 }
 
@@ -44,11 +32,14 @@ type Role struct {
 	gorm.Model
 	Name        string `gorm:"type:varchar(20);unique;not null"`
 	Description string `gorm:"type:varchar(100)"`
-	Users       []User `gorm:"many2many:user_roles;joinForeignKey:role_id;joinReferences:user_id"`
+	Users       []User `gorm:"many2many:user_roles;"`
 }
 
 type UserRole struct {
-	UserID    uint `gorm:"primaryKey"`
-	RoleID    uint `gorm:"primaryKey"`
-	CreatedAt time.Time
+	UserID    uint      `gorm:"primaryKey"`
+	RoleID    uint      `gorm:"primaryKey"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+
+	// User User `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	// Role Role `gorm:"foreignKey:RoleID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 }
