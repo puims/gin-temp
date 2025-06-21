@@ -4,6 +4,7 @@ app:
   author: Alan Wn
   license: Apache2.0
   version: 1.0.0
+  expires: 1
 
 mysql:
   host: 127.0.0.1
@@ -11,6 +12,10 @@ mysql:
   user: root
   password: Mm546896.
   db: myBlog
+  maxOpenConns: 50
+  maxIdleConns: 25
+  maxLifeTime: 30
+  prepareStmt: false
 
 redis:
   host: 127.0.0.1

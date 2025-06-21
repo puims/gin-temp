@@ -1,25 +1,14 @@
-rules:
-  - id: 1
-    resource:
-      host: "*"
-      path: "/admin/*"
-      method: "*"
-    permission:
-      authorized_roles: ["admin"]
-      allow_anyone: false
-  - id: 2
-    resource:
-      host: "*"
-      path: "/user/*"
-      method: "*"
-    permission:
-      authorized_roles: ["user", "admin"]
-      allow_anyone: false
-  - id: 3
-    resource:
-      host: "*"
-      path: "/public/*"
-      method: "*"
-    permission:
-      authorized_roles: []
-      allow_anyone: true
+[request_definition]
+r = sub, obj, act
+
+[policy_definition]
+p = sub, obj, act
+
+[role_definition]
+g = _, _
+
+[policy_effect]
+e = some(where (p.eft == allow))
+
+[matchers]
+m = g(r.sub, p.sub) && keyMatch2(r.obj, p.obj) && (r.act == p.act || p.act == "*")

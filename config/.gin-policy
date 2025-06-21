@@ -1,0 +1,5 @@
+p, admin, /admin, GET
+p, admin, /admin/:id, GET
+p, admin, /admin/modify, PUT
+p, admin, /admin/delete/:id, DELETE
+p, user, /users/modify, PUT

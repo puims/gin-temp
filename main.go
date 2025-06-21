@@ -1,13 +1,13 @@
 package main
 
 import (
-	"gin-temp/models"
-	"gin-temp/routers"
+	"gin-temp/router"
 )
 
 func main() {
-	defer models.DB.Close()
+	app, db, loader := router.SetupApp()
+	defer db.Close()
+	defer loader.Close()
 
-	routers.App.Run(":8080")
-
+	app.Run(":8080")
 }

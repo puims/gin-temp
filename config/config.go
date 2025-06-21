@@ -34,7 +34,7 @@ func initViper() {
 }
 
 func generateFilesToHome() {
-	fileList, err := getYamls()
+	fileList, err := getFiles()
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -69,7 +69,7 @@ func generateFilesToHome() {
 	}
 }
 
-func getYamls() (files []string, err error) {
+func getFiles() (files []string, err error) {
 	dir, err := os.ReadDir("./config/")
 	if err != nil {
 		return nil, err
