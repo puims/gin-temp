@@ -5,6 +5,7 @@ import (
 	"gin-temp/config"
 	"gin-temp/controller"
 	"gin-temp/models"
+	"gin-temp/utils"
 	"io"
 	"log"
 	"os"
@@ -34,7 +35,7 @@ func initLog() {
 	gin.DefaultWriter = io.MultiWriter(f)
 }
 
-func initRoot(db *models.MysqlDB) error {
+func initRoot(db *utils.MysqlDB) error {
 	if err := db.First(&models.User{}, "username = ?", "root").Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Transaction(func(tx *gorm.DB) error {

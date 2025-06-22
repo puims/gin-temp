@@ -12,7 +12,7 @@ import (
 )
 
 type AuthController struct {
-	DB *models.MysqlDB
+	DB *utils.MysqlDB
 }
 
 func (ac *AuthController) TokenRefresh(ctx *gin.Context) {

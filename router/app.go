@@ -10,12 +10,12 @@ import (
 )
 
 var (
-	db = models.NewMysqlDB(&models.User{})
+	db = utils.NewMysqlDB(&models.User{})
 
 	userCtrl = &controller.UserController{DB: db}
 )
 
-func SetupApp() (*gin.Engine, *models.MysqlDB, *utils.CasbinPolicyLoader) {
+func SetupApp() (*gin.Engine, *utils.MysqlDB, *utils.CasbinPolicyLoader) {
 	initLog()
 	initValidator()
 

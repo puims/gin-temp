@@ -19,7 +19,7 @@ var (
 )
 
 type UserController struct {
-	DB *models.MysqlDB
+	DB *utils.MysqlDB
 }
 
 func (uc *UserController) setupSelect() *gorm.DB {
