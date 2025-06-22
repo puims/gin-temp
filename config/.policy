@@ -1,0 +1,11 @@
+p, admin, /admin, GET
+p, admin, /admin/search, GET
+p, admin, /admin/:id, GET
+p, admin, /admin/role/:id, PUT
+p, admin, /admin/delete-user/:id, DELETE
+
+p, user, /users/modify, PUT
+p, user, /users/password, PUT
+
+g, admin, user
+g, root, admin

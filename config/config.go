@@ -9,6 +9,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const appName = "gin-temp"
+
 var Viper = viper.New()
 
 func init() {
@@ -21,7 +23,7 @@ func initViper() {
 
 	Viper.AddConfigPath(confPath)
 	Viper.SetConfigType("yaml")
-	Viper.SetConfigName(".gin-temp")
+	Viper.SetConfigName(".config")
 
 	err := Viper.ReadInConfig()
 	if err != nil {
@@ -80,7 +82,7 @@ func getFiles() (files []string, err error) {
 	}
 
 	for _, file := range dir {
-		if file.Name()[:4] == ".gin" {
+		if file.Name()[:1] == "." {
 			files = append(files, file.Name())
 		}
 	}
@@ -95,5 +97,5 @@ func getConfPath() string {
 		return ""
 	}
 
-	return fmt.Sprintf("%s/.%s", home, "gin-temp")
+	return fmt.Sprintf("%s/.%s", home, appName)
 }

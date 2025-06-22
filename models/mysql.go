@@ -1,7 +1,6 @@
 package models
 
 import (
-	"errors"
 	"fmt"
 	"gin-temp/config"
 	"log"
@@ -17,7 +16,7 @@ type MysqlDB struct {
 }
 
 // NewMysqlDB 创建新的数据库连接实例
-func NewMysqlDB(tables ...interface{}) (*MysqlDB, error) {
+func NewMysqlDB(tables ...interface{}) *MysqlDB {
 	user := config.Viper.GetString("mysql.user")
 	pwd := config.Viper.GetString("mysql.password")
 	host := config.Viper.GetString("mysql.host")
@@ -42,7 +41,7 @@ func NewMysqlDB(tables ...interface{}) (*MysqlDB, error) {
 		Logger:                 logger.Default.LogMode(logger.Warn),
 	})
 	if err != nil {
-		return nil, err
+		log.Panic(err)
 	}
 
 	// 设置创建后的回调
@@ -58,7 +57,7 @@ func NewMysqlDB(tables ...interface{}) (*MysqlDB, error) {
 	// 设置连接池
 	sqlDB, err := db.DB()
 	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
 	maxLifeTime := config.Viper.GetInt("mysql.maxLifeTime")
@@ -69,13 +68,12 @@ func NewMysqlDB(tables ...interface{}) (*MysqlDB, error) {
 	mysqlDB := &MysqlDB{db}
 
 	mysqlDB.Migrate(tables...)
-	mysqlDB.CreateDefaultRoles()
 
 	if err := mysqlDB.Ping(); err != nil {
 		log.Fatalf("Database ping failed: %v", err)
 	}
 
-	return mysqlDB, nil
+	return mysqlDB
 }
 
 // Close 关闭数据库连接
@@ -95,27 +93,6 @@ func (db *MysqlDB) Migrate(tables ...interface{}) error {
 			if err := mig.CreateTable(model); err != nil {
 				return err
 			}
-		}
-	}
-	return nil
-}
-
-func (db *MysqlDB) CreateDefaultRoles() error {
-	defaultRoles := []Role{
-		{Name: "admin", Description: "Administrator with full access"},
-		{Name: "editor", Description: "Content editor"},
-		{Name: "user", Description: "Regular user"},
-	}
-
-	for _, role := range defaultRoles {
-		var existingRole Role
-		result := db.Where("name = ?", role.Name).First(&existingRole)
-		if result.Error != nil && errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			if err := db.Create(&role).Error; err != nil {
-				return fmt.Errorf("failed to create role %s: %w", role.Name, err)
-			}
-		} else if result.Error != nil {
-			return fmt.Errorf("failed to query role %s: %w", role.Name, result.Error)
 		}
 	}
 	return nil

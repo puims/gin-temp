@@ -1,7 +1,8 @@
 package models
 
 import (
-	"time"
+	"fmt"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -9,37 +10,36 @@ import (
 
 type User struct {
 	gorm.Model
-	Username string `gorm:"type:varchar(20);not null;index:idx_username,unique,where:deleted_at IS NULL"`
+	Username string `gorm:"type:varchar(20);uniqueIndex"`
 	Password string `gorm:"type:varchar(255)"`
-	Email    string `gorm:"type:varchar(100);not null;index:idx_email,unique,where:deleted_at IS NULL"`
-	Roles    []Role `gorm:"many2many:user_roles;"`
+	Email    string `gorm:"type:varchar(100);uniqueIndex"`
+	Role     string `gorm:"type:varchar(20);default:'user'"`
 }
 
-func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
-	if u.Password != "" {
-		hashed, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
-		if err != nil {
-			return err
-		}
-
-		u.Password = string(hashed)
-		return nil
+func (u *User) BeforeSave(tx *gorm.DB) (err error) {
+	if u.Password == "" {
+		return
 	}
-	return
+
+	if len(u.Password) == 60 && (strings.HasPrefix(u.Password, "$2a$") ||
+		strings.HasPrefix(u.Password, "$2b$") ||
+		strings.HasPrefix(u.Password, "$2y$")) {
+		return
+	}
+
+	hashed, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	u.Password = string(hashed)
+	return nil
 }
 
-type Role struct {
-	gorm.Model
-	Name        string `gorm:"type:varchar(20);unique;not null"`
-	Description string `gorm:"type:varchar(100)"`
-	Users       []User `gorm:"many2many:user_roles;"`
-}
-
-type UserRole struct {
-	UserID    uint      `gorm:"primaryKey"`
-	RoleID    uint      `gorm:"primaryKey"`
-	CreatedAt time.Time `gorm:"autoCreateTime"`
-
-	// User User `gorm:"foreignKey:UserID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	// Role Role `gorm:"foreignKey:RoleID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+func (u *User) AfterDelete(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		u.Username = fmt.Sprintf("DEL_%s", u.Username)
+		u.Email = fmt.Sprintf("DEL_%s", u.Email)
+		return tx.Save(&u).Error
+	})
 }

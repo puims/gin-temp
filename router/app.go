@@ -9,27 +9,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+var (
+	db = models.NewMysqlDB(&models.User{})
+
+	userCtrl = &controller.UserController{DB: db}
+)
+
 func SetupApp() (*gin.Engine, *models.MysqlDB, *utils.CasbinPolicyLoader) {
 	initLog()
 
-	app := initApp()
-
-	db, err := models.NewMysqlDB(&models.User{}, &models.Role{}, &models.UserRole{})
-	if err != nil {
-		panic(err)
+	if err := initRoot(db); err != nil {
+		log.Println(err)
 	}
+
+	app := initApp()
 
 	enforcer, loader, err := utils.SetupCasbin(db.DB)
 	if err != nil {
 		log.Fatal("Failed to init casbin", err)
 	}
 
-	authCtrl := &controller.AuthController{DB: db}
-	adminCtrl := &controller.AdminController{DB: db}
-
-	setupPublicRoutes(app, authCtrl)
-	setupAdminRoutes(app, enforcer, adminCtrl)
-	setupUserRoutes(app, enforcer, adminCtrl)
+	setupPublicRoutes(app)
+	setupAdminRoutes(app, enforcer)
+	setupUserRoutes(app, enforcer)
 
 	return app, db, loader
 }

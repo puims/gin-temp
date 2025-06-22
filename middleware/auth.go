@@ -45,24 +45,16 @@ func CasbinAuthorization(enforcer *casbin.Enforcer) gin.HandlerFunc {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 			return
 		}
+		sub := claims.(*utils.Claims).Role
 
-		roles := claims.(*utils.Claims).Roles
-		hasPermission := false
-		for _, rl := range roles {
-			ok, err := enforcer.Enforce(rl.Name, obj, act)
-			if err != nil {
-				ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-					"error": "Permission validation failed",
-				})
-				return
-			}
-			if ok {
-				hasPermission = true
-				break
-			}
+		ok, err := enforcer.Enforce(sub, obj, act)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
+				"error": "Permission validation failed",
+			})
+			return
 		}
-
-		if !hasPermission {
+		if !ok {
 			ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "No permission"})
 			return
 		}

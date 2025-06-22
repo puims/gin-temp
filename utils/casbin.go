@@ -164,7 +164,7 @@ func SetupCasbin(db *gorm.DB) (*casbin.Enforcer, *CasbinPolicyLoader, error) {
 		return nil, nil, err
 	}
 
-	loadPath := fmt.Sprintf("%s/.%s/.gin-policy", home, config.Viper.GetString("app.name"))
+	loadPath := fmt.Sprintf("%s/.%s/.policy", home, config.Viper.GetString("app.name"))
 	loader, err := NewPolicyLoader(enforcer, loadPath)
 	if err != nil {
 		return nil, nil, err

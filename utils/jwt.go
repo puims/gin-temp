@@ -11,9 +11,9 @@ import (
 var jwtKey = []byte("happydays")
 
 type Claims struct {
-	ID       uint          `json:"uid"`
-	Username string        `json:"username"`
-	Roles    []models.Role `json:"roles"`
+	ID       uint   `json:"uid"`
+	Username string `json:"username"`
+	Role     string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -22,7 +22,7 @@ func GenerateToken(user *models.User) (string, error) {
 	claims := &Claims{
 		ID:       user.ID,
 		Username: user.Username,
-		Roles:    user.Roles,
+		Role:     user.Role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expTime),
 			Issuer:    "gin-app",
@@ -45,6 +45,5 @@ func ParseToken(token string) (*Claims, error) {
 			return claims, nil
 		}
 	}
-
 	return nil, err
 }
