@@ -157,7 +157,8 @@ func (uc *UserController) LoginCheck(ctx *gin.Context) {
 
 	user := models.User{}
 	if err := uc.DB.Select("id", "username", "password", "email", "role").
-		First(&user, "username = ?", userIn.Username).Error; err != nil {
+		First(&user, "username = ? OR email = ?", userIn.Account, userIn.Account).
+		Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			ctx.JSON(403, gin.H{"error": "user not found"})
 		} else {
@@ -217,7 +218,8 @@ func (uc *UserController) ChangeUserRole(ctx *gin.Context) {
 	}
 
 	if !hasMorePermission(claims.(*utils.Claims).Role, user.Role) ||
-		!hasEquelPermission(claims.(*utils.Claims).Role, userIn.Role) {
+		!hasEquelPermission(claims.(*utils.Claims).Role, userIn.Role) ||
+		!hasRole(userIn.Role) {
 		ctx.JSON(403, gin.H{"error": "no permissions"})
 		return
 	}
@@ -242,11 +244,6 @@ func (uc *UserController) ChangePassword(ctx *gin.Context) {
 	var userIn UserPassword
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
-		return
-	}
-
-	if userIn.Password == userIn.NewPassword {
-		ctx.JSON(403, gin.H{"error": "entered is incorrect"})
 		return
 	}
 
@@ -398,6 +395,15 @@ func hasEquelPermission(current, target string) bool {
 		return false
 	}
 	return iTarget <= iCurrent
+}
+
+func hasRole(target string) bool {
+	for _, rl := range roleList {
+		if rl == target {
+			return true
+		}
+	}
+	return false
 }
 
 func getRoleList() []string {

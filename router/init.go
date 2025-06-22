@@ -3,12 +3,15 @@ package router
 import (
 	"errors"
 	"gin-temp/config"
+	"gin-temp/controller"
 	"gin-temp/models"
 	"io"
 	"log"
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
+	"github.com/go-playground/validator/v10"
 	"gorm.io/gorm"
 )
 
@@ -45,4 +48,12 @@ func initRoot(db *models.MysqlDB) error {
 		}
 	}
 	return nil
+}
+
+func initValidator() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		if err := v.RegisterValidation("password", controller.PasswordValidator); err != nil {
+			panic("failed to register password validator")
+		}
+	}
 }

@@ -17,6 +17,7 @@ var (
 
 func SetupApp() (*gin.Engine, *models.MysqlDB, *utils.CasbinPolicyLoader) {
 	initLog()
+	initValidator()
 
 	if err := initRoot(db); err != nil {
 		log.Println(err)

@@ -1,0 +1,17 @@
+Complete:
+    router
+    viper
+    mysql
+    redis
+    bcrypt
+    jwt & casbin
+    users API
+    validate
+
+To-do:
+    login state & logout
+    articles API
+
+Doing-everyday:
+    coding check
+    less to write, more might
