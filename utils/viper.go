@@ -1,4 +1,4 @@
-package config
+package utils
 
 import (
 	"fmt"
@@ -9,28 +9,21 @@ import (
 	"github.com/spf13/viper"
 )
 
-const appName = "gin-temp"
-
-var Viper = viper.New()
-
-func init() {
-	generateFilesToHome()
-	initViper()
-}
-
-func initViper() {
+func setupViper() *viper.Viper {
 	confPath := getConfPath()
 
-	Viper.AddConfigPath(confPath)
-	Viper.SetConfigType("yaml")
-	Viper.SetConfigName(".config")
+	vp := viper.New()
+	vp.AddConfigPath(confPath)
+	vp.SetConfigType("yaml")
+	vp.SetConfigName(".config")
 
-	err := Viper.ReadInConfig()
+	err := vp.ReadInConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	Viper.WatchConfig()
+	vp.WatchConfig()
+	return vp
 }
 
 func generateFilesToHome() {
@@ -97,5 +90,5 @@ func getConfPath() string {
 		return ""
 	}
 
-	return fmt.Sprintf("%s/.%s", home, appName)
+	return fmt.Sprintf("%s/.%s", home, AppName)
 }

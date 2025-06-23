@@ -1,15 +1,27 @@
 package controller
 
 import (
+	"gin-temp/utils"
 	"regexp"
 	"strings"
+	"unicode"
 
 	"github.com/go-playground/validator/v10"
 )
 
+var (
+	roleList       = getRoleList()
+	lowercaseRegex = regexp.MustCompile(`[a-z]`)
+	numberRegex    = regexp.MustCompile(`[0-9]`)
+)
+
+type UserController struct {
+	DB *utils.MysqlDB
+}
+
 type UserCreate struct {
-	Username string `json:"username" binding:"required,min=3,max=20"`
-	Password string `json:"password" binding:"required,min=6,password"`
+	Username string `json:"username" binding:"required,username"`
+	Password string `json:"password" binding:"required,password"`
 	Email    string `json:"email" binding:"required,email"`
 }
 
@@ -23,20 +35,39 @@ type UserRole struct {
 }
 
 type UserInfo struct {
-	Username string `json:"username" binding:"required,min=3,max=20"`
+	Username string `json:"username" binding:"required,username"`
 	Email    string `json:"email" binding:"required,email"`
 }
 
 type UserPassword struct {
-	Password    string `json:"password" binding:"required,min=6"`
-	NewPassword string `json:"newpassword" binding:"required,min=6,password"`
+	Password    string `json:"password" binding:"required"`
+	NewPassword string `json:"newpassword" binding:"required,password"`
+}
+
+func UsernameValidator(fl validator.FieldLevel) bool {
+	username := fl.Field().String()
+	if len(username) < 3 || len(username) > 20 {
+		return false
+	}
+
+	hasLetter := false
+	for _, char := range username {
+		if unicode.IsLetter(char) {
+			hasLetter = true
+		} else if !unicode.IsNumber(char) {
+			return false
+		}
+	}
+
+	return hasLetter
 }
 
 func PasswordValidator(fl validator.FieldLevel) bool {
-	lowercaseRegex := regexp.MustCompile(`[a-z]`)
-	numberRegex := regexp.MustCompile(`[0-9]`)
-
 	password := fl.Field().String()
+	if len(password) < 6 {
+		return false
+	}
+
 	lowerPassword := strings.ToLower(password)
 
 	hasLetter := lowercaseRegex.MatchString(lowerPassword)

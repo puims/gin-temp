@@ -2,30 +2,17 @@ package controller
 
 import (
 	"errors"
-	"gin-temp/config"
 	"gin-temp/models"
 	"gin-temp/utils"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
-
-var (
-	roleList = getRoleList()
-)
-
-type UserController struct {
-	DB *utils.MysqlDB
-}
-
-func (uc *UserController) setupSelect() *gorm.DB {
-	return uc.DB.Select("id", "username", "email", "role",
-		"created_at", "updated_at")
-}
 
 func (uc *UserController) GetAllUsers(ctx *gin.Context) {
 	// 1. 分页参数处理
@@ -148,7 +135,7 @@ func (uc *UserController) CreateUser(ctx *gin.Context) {
 	})
 }
 
-func (uc *UserController) LoginCheck(ctx *gin.Context) {
+func (uc *UserController) Login(ctx *gin.Context) {
 	userIn := UserLogin{}
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
 		ctx.JSON(403, gin.H{"error": err.Error()})
@@ -173,15 +160,24 @@ func (uc *UserController) LoginCheck(ctx *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(&user)
+	expires := utils.Viper.GetInt("app.expires")
+	accessToken, err := utils.GenerateToken(&user, expires, utils.JwtKey)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError,
 			gin.H{"error": "Failed to generate token"})
 		return
 	}
 
+	refreshToken, err := utils.GenerateToken(&user, 168, utils.JwtKeyRefresh)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError,
+			gin.H{"error": "Failed to generate refresh token"})
+		return
+	}
+
 	ctx.JSON(200, gin.H{
-		"token": token,
+		"access-token":  accessToken,
+		"refresh-token": refreshToken,
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
@@ -189,6 +185,64 @@ func (uc *UserController) LoginCheck(ctx *gin.Context) {
 			"role":     user.Role,
 		},
 	})
+}
+
+func (uc *UserController) Logout(ctx *gin.Context) {
+	token := ctx.GetHeader("Authorization")
+
+	claims, exists := ctx.Get("claims")
+	if !exists {
+		ctx.JSON(401, gin.H{"error": "unauthorization"})
+		return
+	}
+
+	if err := utils.AddToBlackList(token,
+		time.Unix(claims.(*utils.Claims).ExpiresAt.Unix(), 0),
+		utils.Redis); err != nil {
+		ctx.JSON(500, gin.H{"error": "failed to logout"})
+		return
+	}
+
+	ctx.JSON(200, gin.H{
+		"state":   true,
+		"message": "user has logout",
+	})
+}
+
+func (uc *UserController) TokenRefresh(ctx *gin.Context) {
+	refreshToken := ctx.PostForm("refresh-token")
+	if refreshToken == "" {
+		ctx.JSON(403, gin.H{"error": "failed to get refresh-token"})
+		return
+	}
+
+	claims, err := utils.ParseToken(refreshToken, utils.JwtKeyRefresh)
+	if err != nil {
+		ctx.JSON(500, gin.H{"error": "failed to parse refresh-token"})
+		return
+	}
+
+	user := models.User{}
+	if err := uc.DB.Select("id", "username", "role").First(&user, "id = ?", claims.ID).
+		Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		} else {
+			ctx.JSON(500, gin.H{"error": "Failed to retrieve user: " + err.Error()})
+		}
+		return
+	}
+
+	accessToken := ""
+	expires := utils.Viper.GetInt("app.expires")
+	accessToken, err = utils.GenerateToken(&user, expires, utils.JwtKey)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"access-token": accessToken})
+
 }
 
 func (uc *UserController) ChangeUserRole(ctx *gin.Context) {
@@ -217,10 +271,13 @@ func (uc *UserController) ChangeUserRole(ctx *gin.Context) {
 		return
 	}
 
-	if !hasMorePermission(claims.(*utils.Claims).Role, user.Role) ||
-		!hasEquelPermission(claims.(*utils.Claims).Role, userIn.Role) ||
-		!hasRole(userIn.Role) {
+	if !hasPermission(claims.(*utils.Claims).Role, user.Role) {
 		ctx.JSON(403, gin.H{"error": "no permissions"})
+		return
+	}
+
+	if indexOf(roleList, userIn.Role) < 0 {
+		ctx.JSON(403, gin.H{"error": "entries incorrect"})
 		return
 	}
 
@@ -333,7 +390,7 @@ func (uc *UserController) DeleteUser(ctx *gin.Context) {
 		return
 	}
 
-	if !hasMorePermission(claims.(*utils.Claims).Role, user.Role) {
+	if !hasPermission(claims.(*utils.Claims).Role, user.Role) {
 		ctx.JSON(403, gin.H{"error": "no permissions"})
 		return
 	}
@@ -358,6 +415,11 @@ func (uc *UserController) DeleteUser(ctx *gin.Context) {
 	})
 }
 
+func (uc *UserController) setupSelect() *gorm.DB {
+	return uc.DB.Select("id", "username", "email", "role",
+		"created_at", "updated_at")
+}
+
 func (uc *UserController) getCurrentUser(ctx *gin.Context) (*models.User, error) {
 	claims, exists := ctx.Get("claims")
 	if !exists {
@@ -377,7 +439,7 @@ func (uc *UserController) getCurrentUser(ctx *gin.Context) (*models.User, error)
 	return &user, nil
 }
 
-func hasMorePermission(current, target string) bool {
+func hasPermission(current, target string) bool {
 	iCurrent := indexOf(roleList, current)
 	iTarget := indexOf(roleList, target)
 
@@ -387,27 +449,8 @@ func hasMorePermission(current, target string) bool {
 	return iTarget < iCurrent
 }
 
-func hasEquelPermission(current, target string) bool {
-	iCurrent := indexOf(roleList, current)
-	iTarget := indexOf(roleList, target)
-
-	if iCurrent < 0 || iTarget < 0 {
-		return false
-	}
-	return iTarget <= iCurrent
-}
-
-func hasRole(target string) bool {
-	for _, rl := range roleList {
-		if rl == target {
-			return true
-		}
-	}
-	return false
-}
-
 func getRoleList() []string {
-	rolesStr := config.Viper.GetString("app.roles")
+	rolesStr := utils.Viper.GetString("app.roles")
 	return strings.Split(rolesStr, ",")
 }
 

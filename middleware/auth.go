@@ -10,11 +10,20 @@ import (
 
 func JwtAuthorization() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		var token string
+		token := ctx.GetHeader("Authorization")
 
-		authHeader := ctx.GetHeader("Authorization")
-		if authHeader[:7] == "Bearer " {
-			token = authHeader[7:]
+		isblack, err := utils.InBlackList(token, utils.Redis)
+		if err != nil {
+			ctx.AbortWithStatusJSON(500, gin.H{"error": "server errors"})
+			return
+		}
+		if isblack {
+			ctx.AbortWithStatusJSON(401, gin.H{"error": "user has logout"})
+			return
+		}
+
+		if token[:7] == "Bearer " {
+			token = token[7:]
 		} else {
 			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "failed to get token from header",
@@ -22,7 +31,7 @@ func JwtAuthorization() gin.HandlerFunc {
 			return
 		}
 
-		claims, err := utils.ParseToken(token)
+		claims, err := utils.ParseToken(token, utils.JwtKey)
 		if err != nil {
 			ctx.AbortWithStatusJSON(401, gin.H{"error": "Invalid token"})
 			return

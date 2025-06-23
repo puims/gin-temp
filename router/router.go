@@ -1,10 +1,16 @@
 package router
 
 import (
+	"gin-temp/controller"
 	"gin-temp/middleware"
+	"gin-temp/utils"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
+)
+
+var (
+	userCtrl = &controller.UserController{DB: utils.DB}
 )
 
 func setupPublicRoutes(app *gin.Engine) {
@@ -14,7 +20,7 @@ func setupPublicRoutes(app *gin.Engine) {
 
 	app.POST("/register", userCtrl.CreateUser)
 
-	app.POST("/login", userCtrl.LoginCheck)
+	app.POST("/login", userCtrl.Login)
 }
 
 func setupAdminRoutes(app *gin.Engine, enforcer *casbin.Enforcer) {
@@ -39,7 +45,9 @@ func setupUserRoutes(app *gin.Engine, enforcer *casbin.Enforcer) {
 		middleware.CasbinAuthorization(enforcer),
 	)
 	{
+		r1.PUT("/logout", userCtrl.Logout)
 		r1.PUT("/modify", userCtrl.ChangeUserinfo)
 		r1.PUT("/password", userCtrl.ChangePassword)
+		r1.POST("/refresh", userCtrl.TokenRefresh)
 	}
 }

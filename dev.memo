@@ -7,10 +7,11 @@ Complete:
     jwt & casbin
     users API
     validate
+    login state & logout
 
 To-do:
-    login state & logout
     articles API
+    vue
 
 Doing-everyday:
     coding check

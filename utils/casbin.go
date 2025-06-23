@@ -3,7 +3,7 @@ package utils
 import (
 	"bufio"
 	"fmt"
-	"gin-temp/config"
+	"log"
 	"os"
 	"strings"
 	"time"
@@ -11,7 +11,6 @@ import (
 	"github.com/casbin/casbin/v2"
 	gormAdapter "github.com/casbin/gorm-adapter/v3"
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -21,7 +20,7 @@ type CasbinPolicyLoader struct {
 	watcher  *fsnotify.Watcher
 }
 
-func (ld *CasbinPolicyLoader) LoadPolicy() (err error) {
+func (ld *CasbinPolicyLoader) loadPolicy() (err error) {
 	file, err := os.Open(ld.path)
 	if err != nil {
 		return err
@@ -38,7 +37,7 @@ func (ld *CasbinPolicyLoader) LoadPolicy() (err error) {
 		}
 
 		if !ld.validatePolicyLine(line) {
-			logrus.Warnf("Invalid policy line: %s", line)
+			log.Printf("Invalid policy line: %s", line)
 			continue
 		}
 
@@ -67,13 +66,13 @@ func (ld *CasbinPolicyLoader) LoadPolicy() (err error) {
 		return err
 	}
 
-	logrus.Info("Casbin policy reloaded from file")
+	log.Println("Casbin policy reloaded from file")
 	return nil
 }
 
 func (ld *CasbinPolicyLoader) watchPolicyFile() {
 	if err := ld.watcher.Add(ld.path); err != nil {
-		logrus.Errorf("Failed to watch policy file: %v", err)
+		log.Printf("Failed to watch policy file: %v", err)
 		return
 	}
 
@@ -91,9 +90,9 @@ func (ld *CasbinPolicyLoader) watchPolicyFile() {
 				}
 
 				timer = time.AfterFunc(500*time.Millisecond, func() {
-					logrus.Info("Policy file modified, reloading...")
-					if err := ld.LoadPolicy(); err != nil {
-						logrus.Errorf("Failed to reload policy: %v", err)
+					log.Printf("Policy file modified, reloading...")
+					if err := ld.loadPolicy(); err != nil {
+						log.Printf("Failed to reload policy: %v", err)
 					}
 				})
 			}
@@ -101,7 +100,7 @@ func (ld *CasbinPolicyLoader) watchPolicyFile() {
 			if !ok {
 				return
 			}
-			logrus.Errorf("Policy file watcher error: %v", err)
+			log.Printf("Policy file watcher error: %v", err)
 		}
 	}
 }
@@ -126,7 +125,7 @@ func (ld *CasbinPolicyLoader) Close() error {
 	return ld.watcher.Close()
 }
 
-func NewPolicyLoader(enforcer *casbin.Enforcer, path string) (*CasbinPolicyLoader, error) {
+func newPolicyLoader(enforcer *casbin.Enforcer, path string) (*CasbinPolicyLoader, error) {
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -139,7 +138,7 @@ func NewPolicyLoader(enforcer *casbin.Enforcer, path string) (*CasbinPolicyLoade
 		watcher:  watcher,
 	}
 
-	if err := loader.LoadPolicy(); err != nil {
+	if err := loader.loadPolicy(); err != nil {
 		return nil, err
 	}
 
@@ -148,7 +147,7 @@ func NewPolicyLoader(enforcer *casbin.Enforcer, path string) (*CasbinPolicyLoade
 	return loader, nil
 }
 
-func SetupCasbin(db *gorm.DB) (*casbin.Enforcer, *CasbinPolicyLoader, error) {
+func setupCasbin(db *gorm.DB) (*casbin.Enforcer, *CasbinPolicyLoader, error) {
 	adapter, err := gormAdapter.NewAdapterByDB(db)
 	if err != nil {
 		return nil, nil, err
@@ -164,8 +163,8 @@ func SetupCasbin(db *gorm.DB) (*casbin.Enforcer, *CasbinPolicyLoader, error) {
 		return nil, nil, err
 	}
 
-	loadPath := fmt.Sprintf("%s/.%s/.policy", home, config.Viper.GetString("app.name"))
-	loader, err := NewPolicyLoader(enforcer, loadPath)
+	loadPath := fmt.Sprintf("%s/.%s/.policy", home, Viper.GetString("app.name"))
+	loader, err := newPolicyLoader(enforcer, loadPath)
 	if err != nil {
 		return nil, nil, err
 	}

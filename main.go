@@ -5,9 +5,9 @@ import (
 )
 
 func main() {
-	app, db, loader := router.SetupApp()
+	app, db, policyLoader := router.SetupApp()
 	defer db.Close()
-	defer loader.Close()
+	defer policyLoader.Close()
 
 	app.Run(":8080")
 }

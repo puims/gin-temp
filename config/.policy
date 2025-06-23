@@ -4,8 +4,11 @@ p, admin, /admin/:id, GET
 p, admin, /admin/role/:id, PUT
 p, admin, /admin/delete-user/:id, DELETE
 
+p, user, /users/logout, PUT
 p, user, /users/modify, PUT
 p, user, /users/password, PUT
+p, user, /users/refresh, POST
 
-g, admin, user
+g, editor, user
+g, admin, editor
 g, root, admin
