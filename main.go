@@ -1,13 +1,13 @@
 package main
 
 import (
-	"gin-temp/router"
+	"gin-temp/app"
+	"gin-temp/util"
 )
 
 func main() {
-	app, db, policyLoader := router.SetupApp()
-	defer db.Close()
-	defer policyLoader.Close()
+	engine := app.SetupApp()
+	defer app.CleanUp(util.DB, util.Redis, util.PolicyLoader, util.Logger)
 
-	app.Run(":8080")
+	engine.Run(":8080")
 }

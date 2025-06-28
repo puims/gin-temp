@@ -1,7 +1,7 @@
 package controller
 
 import (
-	"gin-temp/utils"
+	"gin-temp/util"
 	"regexp"
 	"strings"
 	"unicode"
@@ -16,7 +16,7 @@ var (
 )
 
 type UserController struct {
-	DB *utils.MysqlDB
+	DB *util.MysqlDB
 }
 
 type UserCreate struct {

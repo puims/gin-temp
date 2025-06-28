@@ -1,9 +1,9 @@
-package utils
+package util
 
 import (
 	"errors"
 	"fmt"
-	"gin-temp/models"
+	"gin-temp/model"
 	"log"
 	"time"
 
@@ -32,7 +32,7 @@ func newMysqlDB() *MysqlDB {
 		Logger:                 logger.Default.LogMode(logger.Error),
 	})
 	if err != nil {
-		log.Panic(err)
+		log.Fatal(err)
 	}
 
 	sqlDB, err := db.DB()
@@ -61,10 +61,10 @@ func (db *MysqlDB) mysqlMigrate(tables ...interface{}) error {
 }
 
 func (db *MysqlDB) addRoot() error {
-	if err := db.First(&models.User{}, "username = ?", "root").Error; err != nil {
+	if err := db.First(&model.User{}, "username = ?", "root").Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return db.Transaction(func(tx *gorm.DB) error {
-				user := models.User{
+				user := model.User{
 					Username: "root",
 					Password: "root",
 					Role:     "root",

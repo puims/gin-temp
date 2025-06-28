@@ -1,16 +1,11 @@
-package router
+package app
 
 import (
-	"gin-temp/controller"
 	"gin-temp/middleware"
-	"gin-temp/utils"
+	"gin-temp/util"
+	"time"
 
-	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
-)
-
-var (
-	userCtrl = &controller.UserController{DB: utils.DB}
 )
 
 func setupPublicRoutes(app *gin.Engine) {
@@ -20,15 +15,16 @@ func setupPublicRoutes(app *gin.Engine) {
 
 	app.POST("/register", userCtrl.CreateUser)
 
-	app.POST("/login", userCtrl.Login)
+	app.POST(
+		"/login",
+		userCtrl.Login,
+		middleware.RateLimiter(util.Redis, util.Viper.GetInt("rate.login"), time.Minute),
+	)
 }
 
-func setupAdminRoutes(app *gin.Engine, enforcer *casbin.Enforcer) {
-	r1 := app.Group(
-		"/admin",
-		middleware.JwtAuthorization(),
-		middleware.CasbinAuthorization(enforcer),
-	)
+func setupAdminRoutes(app *gin.Engine) {
+	r1 := app.Group("/admin")
+	r1.Use(handlerFuncListOfAuthAndRbac...)
 	{
 		r1.GET("", userCtrl.GetAllUsers)
 		r1.GET("/search", userCtrl.SearchUserByKeyward)
@@ -38,12 +34,9 @@ func setupAdminRoutes(app *gin.Engine, enforcer *casbin.Enforcer) {
 	}
 }
 
-func setupUserRoutes(app *gin.Engine, enforcer *casbin.Enforcer) {
-	r1 := app.Group(
-		"/users",
-		middleware.JwtAuthorization(),
-		middleware.CasbinAuthorization(enforcer),
-	)
+func setupUserRoutes(app *gin.Engine) {
+	r1 := app.Group("/users")
+	r1.Use(handlerFuncListOfAuthAndRbac...)
 	{
 		r1.PUT("/logout", userCtrl.Logout)
 		r1.PUT("/modify", userCtrl.ChangeUserinfo)

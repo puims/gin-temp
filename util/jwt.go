@@ -1,8 +1,9 @@
-package utils
+package util
 
 import (
 	"context"
-	"gin-temp/models"
+	"gin-temp/model"
+	"log"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -10,8 +11,8 @@ import (
 )
 
 var (
-	JwtKey        = []byte("happydays")
-	JwtKeyRefresh = []byte("happydog")
+	JwtKey        []byte
+	JwtKeyRefresh []byte
 )
 
 type Claims struct {
@@ -21,7 +22,16 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(user *models.User, expires int, jwtKey []byte) (string, error) {
+func initJWTKeys() {
+	JwtKey = []byte(Viper.GetString("jwt.access_key"))
+	JwtKeyRefresh = []byte(Viper.GetString("jwt.refresh_key"))
+
+	if len(JwtKey) < 32 || len(JwtKeyRefresh) < 32 {
+		log.Fatal("JWT keys must be at least 32 bytes long")
+	}
+}
+
+func GenerateToken(user *model.User, expires int, jwtKey []byte) (string, error) {
 	expTime := time.Now().Add(time.Duration(expires) * time.Hour)
 	claims := &Claims{
 		ID:       user.ID,

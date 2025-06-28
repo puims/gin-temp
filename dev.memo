@@ -1,4 +1,5 @@
 Complete:
+    app
     router
     viper
     mysql
@@ -8,10 +9,19 @@ Complete:
     users API
     validate
     login state & logout
+    response in struct
+    logger
+    rateLimiter
+    defer function: cleanUp
 
 To-do:
+    Make users API compliant with RESTFul specification
+    jwt: HS256 -> ES256
+    CSRF
+    cache of mysql query
     articles API
-    vue
+    cron: down log files
+    frontend: flutter
 
 Doing-everyday:
     coding check

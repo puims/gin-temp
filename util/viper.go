@@ -1,4 +1,4 @@
-package utils
+package util
 
 import (
 	"fmt"
@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/fsnotify/fsnotify"
 	"github.com/spf13/viper"
 )
 
@@ -23,6 +24,15 @@ func setupViper() *viper.Viper {
 	}
 
 	vp.WatchConfig()
+
+	vp.OnConfigChange(func(e fsnotify.Event) {
+		log.Println("Config file changed:", e.Name)
+		if err := vp.ReadInConfig(); err != nil {
+			log.Println("Error reloading config:", err)
+		}
+		// 重新初始化依赖配置的组件
+		initJWTKeys()
+	})
 	return vp
 }
 
@@ -51,20 +61,21 @@ func generateFilesToHome() {
 			log.Print(err)
 			return
 		}
-		defer src.Close()
 
 		dst, err := os.Create(fmt.Sprintf("%s/%s", confPath, fileName))
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		defer dst.Close()
 
 		_, err = io.Copy(dst, src)
 		if err != nil {
 			log.Println(err)
 			return
 		}
+
+		src.Close()
+		dst.Close()
 	}
 }
 
@@ -75,11 +86,11 @@ func getFiles() (files []string, err error) {
 	}
 
 	for _, file := range dir {
-		if file.Name()[:1] == "." {
+		name := file.Name()
+		if len(name) > 0 && name[0] == '.' {
 			files = append(files, file.Name())
 		}
 	}
-
 	return
 }
 

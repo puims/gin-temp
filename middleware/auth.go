@@ -1,8 +1,9 @@
 package middleware
 
 import (
-	"gin-temp/utils"
-	"net/http"
+	"errors"
+	"gin-temp/model"
+	"gin-temp/util"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/gin-gonic/gin"
@@ -12,28 +13,25 @@ func JwtAuthorization() gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		token := ctx.GetHeader("Authorization")
 
-		isblack, err := utils.InBlackList(token, utils.Redis)
+		isblack, err := util.InBlackList(token, util.Redis)
 		if err != nil {
-			ctx.AbortWithStatusJSON(500, gin.H{"error": "server errors"})
+			model.ErrorAbortResponse(ctx, 500, err)
 			return
 		}
 		if isblack {
-			ctx.AbortWithStatusJSON(401, gin.H{"error": "user has logout"})
+			model.ErrorAbortResponse(ctx, 401, errors.New("user has logout"))
 			return
 		}
 
-		if token[:7] == "Bearer " {
-			token = token[7:]
-		} else {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "failed to get token from header",
-			})
+		if len(token) < 7 || token[:7] != "Bearer " {
+			model.ErrorAbortResponse(ctx, 401, errors.New("failed to get token from header"))
 			return
 		}
+		token = token[7:]
 
-		claims, err := utils.ParseToken(token, utils.JwtKey)
+		claims, err := util.ParseToken(token, util.JwtKey)
 		if err != nil {
-			ctx.AbortWithStatusJSON(401, gin.H{"error": "Invalid token"})
+			model.ErrorAbortResponse(ctx, 401, err)
 			return
 		}
 
@@ -51,20 +49,18 @@ func CasbinAuthorization(enforcer *casbin.Enforcer) gin.HandlerFunc {
 		// 获取用户的角色
 		claims, exists := ctx.Get("claims")
 		if !exists {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+			model.ErrorAbortResponse(ctx, 401, errors.New("unauthorized"))
 			return
 		}
-		sub := claims.(*utils.Claims).Role
+		sub := claims.(*util.Claims).Role
 
 		ok, err := enforcer.Enforce(sub, obj, act)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-				"error": "Permission validation failed",
-			})
+			model.ErrorAbortResponse(ctx, 500, err)
 			return
 		}
 		if !ok {
-			ctx.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "No permission"})
+			model.ErrorAbortResponse(ctx, 403, errors.New("forbidden"))
 			return
 		}
 

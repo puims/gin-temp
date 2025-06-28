@@ -1,7 +1,9 @@
-package utils
+package util
 
 import (
-	"gin-temp/models"
+	"gin-temp/model"
+	"log"
+	"os"
 
 	"github.com/casbin/casbin/v2"
 	"github.com/redis/go-redis/v9"
@@ -12,6 +14,7 @@ const AppName = "gin-temp"
 
 var (
 	Viper        *viper.Viper
+	Logger       *os.File
 	Enforcer     *casbin.Enforcer
 	PolicyLoader *CasbinPolicyLoader
 	DB           *MysqlDB
@@ -24,14 +27,16 @@ func init() {
 
 	Viper = setupViper()
 
+	Logger = createLogFile()
+
 	DB = newMysqlDB()
-	DB.mysqlMigrate(&models.User{})
+	DB.mysqlMigrate(&model.User{})
 	DB.ping()
 	DB.addRoot()
 
 	Enforcer, PolicyLoader, err = setupCasbin(DB.DB)
 	if err != nil {
-		panic("failed to init casbin")
+		log.Fatal("failed to init casbin")
 	}
 
 	Redis = setupRedis()

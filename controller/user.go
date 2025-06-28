@@ -2,8 +2,8 @@ package controller
 
 import (
 	"errors"
-	"gin-temp/models"
-	"gin-temp/utils"
+	"gin-temp/model"
+	"gin-temp/util"
 	"net/http"
 	"strconv"
 	"strings"
@@ -26,89 +26,85 @@ func (uc *UserController) GetAllUsers(ctx *gin.Context) {
 	}
 
 	// 2. 查询用户列表(优化查询字段)
-	var users []models.User
+	var users []model.User
 	query := uc.setupSelect().Order("created_at DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize)
 
 	if err := query.Find(&users).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		return
 	}
 
 	// 3. 获取总数
 	var total int64
-	if err := uc.DB.Model(&models.User{}).Count(&total).Error; err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users"})
+	if err := uc.DB.Model(&model.User{}).Count(&total).Error; err != nil {
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		return
 	}
 
 	// 4. 返回响应(隐藏敏感信息)
-	ctx.JSON(http.StatusOK, gin.H{
-		"data":  users,
-		"total": total,
-		"page":  page,
-		"size":  pageSize,
-	})
+	model.SuccessPaginateResponse(ctx, 200, users, page, int(total), pageSize)
 }
 
 func (uc *UserController) SearchUserByKeyward(ctx *gin.Context) {
 	keyword := ctx.Query("keyword")
 	keyword = "%" + keyword + "%"
 
-	var users []models.User
+	var users []model.User
 	if err := uc.setupSelect().Where("username LIKE ? OR email LIKE ?", keyword, keyword).
 		Find(&users).Error; err != nil {
-		ctx.JSON(500, gin.H{"error": "failed to search user"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		return
 	}
 
-	ctx.JSON(200, users)
+	model.SuccessResponse(ctx, 200, users)
 }
 
 func (uc *UserController) GetUserById(ctx *gin.Context) {
 	// 1. 参数验证
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil || id <= 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid user ID"))
 		return
 	}
 
 	// 2. 查询用户(优化查询字段)
-	var user models.User
+	var user model.User
 	err = uc.setupSelect().First(&user, "id = ?", id).Error
 
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			model.ErrorResponse(ctx, http.StatusNotFound, errors.New("user not found"))
 		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
+			return
 		}
 		return
 	}
 
 	// 3. 返回响应
-	ctx.JSON(http.StatusOK, user)
+	model.SuccessResponse(ctx, 200, user)
 }
 
 func (uc *UserController) CreateUser(ctx *gin.Context) {
 	userIn := UserCreate{}
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
-		ctx.JSON(403, gin.H{"error": err.Error()})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid request payload"))
 		return
 	}
 
-	queryUser := models.User{}
+	queryUser := model.User{}
 	if err := uc.DB.First(&queryUser, "username = ? OR email = ?", userIn.Username, userIn.Email).
 		Error; err == nil {
-		ctx.JSON(http.StatusConflict, gin.H{"error": "Username or email already exists"})
+		model.ErrorResponse(ctx, http.StatusConflict, errors.New("username or email already exists"))
 		return
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		return
 	}
 
-	user := models.User{
+	user := model.User{
 		Username: userIn.Username,
 		Password: userIn.Password,
 		Email:    userIn.Email,
@@ -121,69 +117,75 @@ func (uc *UserController) CreateUser(ctx *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusCreated, gin.H{
-		"message": "User registered successfully",
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-		},
+	userResponse := model.UserResponse{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Username:  user.Username,
+		Email:     user.Email,
+		Role:      user.Role,
+	}
+
+	model.SuccessResponse(ctx, 201, gin.H{
+		"user": userResponse,
 	})
 }
 
 func (uc *UserController) Login(ctx *gin.Context) {
 	userIn := UserLogin{}
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
-		ctx.JSON(403, gin.H{"error": err.Error()})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid request payload"))
 		return
 	}
 
-	user := models.User{}
+	user := model.User{}
 	if err := uc.DB.Select("id", "username", "password", "email", "role").
 		First(&user, "username = ? OR email = ?", userIn.Account, userIn.Account).
 		Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(403, gin.H{"error": "user not found"})
+			model.ErrorResponse(ctx, http.StatusNotFound, errors.New("user not found"))
 		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		}
 		return
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(userIn.Password)); err != nil {
-		ctx.JSON(http.StatusConflict,
-			gin.H{"error": "Invalid credentials"})
+		model.ErrorAbortResponse(ctx, http.StatusConflict, errors.New("invalid credentials"))
 		return
 	}
 
-	expires := utils.Viper.GetInt("app.expires")
-	accessToken, err := utils.GenerateToken(&user, expires, utils.JwtKey)
+	expires := util.Viper.GetInt("app.expires")
+	accessToken, err := util.GenerateToken(&user, expires, util.JwtKey)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError,
-			gin.H{"error": "Failed to generate token"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("failed to generate token"))
 		return
 	}
 
-	refreshToken, err := utils.GenerateToken(&user, 168, utils.JwtKeyRefresh)
+	refreshToken, err := util.GenerateToken(&user, 168, util.JwtKeyRefresh)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError,
-			gin.H{"error": "Failed to generate refresh token"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("failed to generate refresh token"))
 		return
 	}
 
-	ctx.JSON(200, gin.H{
+	userResponse := model.UserResponse{
+		ID:        user.ID,
+		CreatedAt: user.CreatedAt,
+		UpdatedAt: user.UpdatedAt,
+		Username:  user.Username,
+		Email:     user.Email,
+		Role:      user.Role,
+	}
+
+	model.SuccessResponse(ctx, 200, gin.H{
 		"access-token":  accessToken,
 		"refresh-token": refreshToken,
-		"user": gin.H{
-			"id":       user.ID,
-			"username": user.Username,
-			"email":    user.Email,
-			"role":     user.Role,
-		},
+		"user":          userResponse,
+		"expires":       time.Now().Add(time.Duration(expires) * time.Hour),
 	})
 }
 
@@ -192,64 +194,67 @@ func (uc *UserController) Logout(ctx *gin.Context) {
 
 	claims, exists := ctx.Get("claims")
 	if !exists {
-		ctx.JSON(401, gin.H{"error": "unauthorization"})
+		model.ErrorResponse(ctx, 401, errors.New("unauthorization"))
 		return
 	}
 
-	if err := utils.AddToBlackList(token,
-		time.Unix(claims.(*utils.Claims).ExpiresAt.Unix(), 0),
-		utils.Redis); err != nil {
-		ctx.JSON(500, gin.H{"error": "failed to logout"})
-		return
+	if err := util.AddToBlackList(token,
+		time.Unix(claims.(*util.Claims).ExpiresAt.Unix(), 0),
+		util.Redis); err != nil {
+		model.ErrorResponse(ctx, 500, errors.New("failed to add token to blacklist: "+err.Error()))
 	}
 
-	ctx.JSON(200, gin.H{
-		"state":   true,
-		"message": "user has logout",
-	})
+	model.SuccessResponse(ctx, 200, gin.H{"message": "user has logout"})
 }
 
 func (uc *UserController) TokenRefresh(ctx *gin.Context) {
 	refreshToken := ctx.PostForm("refresh-token")
 	if refreshToken == "" {
-		ctx.JSON(403, gin.H{"error": "failed to get refresh-token"})
+		model.ErrorResponse(ctx, 403, errors.New("failed to get refresh-token"))
 		return
 	}
 
-	claims, err := utils.ParseToken(refreshToken, utils.JwtKeyRefresh)
+	claims, err := util.ParseToken(refreshToken, util.JwtKeyRefresh)
 	if err != nil {
-		ctx.JSON(500, gin.H{"error": "failed to parse refresh-token"})
+		model.ErrorResponse(ctx, 403, errors.New("failed to parse refresh-token: "+err.Error()))
 		return
 	}
 
-	user := models.User{}
+	user := model.User{}
 	if err := uc.DB.Select("id", "username", "role").First(&user, "id = ?", claims.ID).
 		Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			model.ErrorResponse(ctx, 403, errors.New("user not found"))
 		} else {
-			ctx.JSON(500, gin.H{"error": "Failed to retrieve user: " + err.Error()})
+			model.ErrorResponse(ctx, 500, errors.New("database error: "+err.Error()))
 		}
 		return
 	}
 
 	accessToken := ""
-	expires := utils.Viper.GetInt("app.expires")
-	accessToken, err = utils.GenerateToken(&user, expires, utils.JwtKey)
+	expires := util.Viper.GetInt("app.expires")
+	accessToken, err = util.GenerateToken(&user, expires, util.JwtKey)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate token"})
+		model.ErrorResponse(ctx, 500, errors.New("failed to generate access token: "+err.Error()))
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"access-token": accessToken})
-
+	model.SuccessResponse(ctx, 200, gin.H{
+		"code":          200,
+		"state":         "success",
+		"data":          user,
+		"message":       "token refreshed successfully",
+		"access-token":  accessToken,
+		"refresh-token": refreshToken,
+		"expires":       expires,
+	})
 }
 
 func (uc *UserController) ChangeUserRole(ctx *gin.Context) {
 	// 1. 参数绑定与验证
 	var userIn UserRole
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid request payload"))
 		return
 	}
 
@@ -257,88 +262,86 @@ func (uc *UserController) ChangeUserRole(ctx *gin.Context) {
 	id := ctx.Param("id")
 	claims, exists := ctx.Get("claims")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		model.ErrorResponse(ctx, 401, errors.New("unauthorization"))
 		return
 	}
-	if id == strconv.Itoa(int(claims.(*utils.Claims).ID)) {
-		ctx.JSON(403, gin.H{"error": "could not change role by yourself"})
+	if id == strconv.Itoa(int(claims.(*util.Claims).ID)) {
+		model.ErrorResponse(ctx, 403, errors.New("could not change role by yourself"))
 		return
 	}
 
-	user := models.User{}
+	user := model.User{}
 	if err := uc.DB.First(&user, "id = ?", id).Error; err != nil {
-		ctx.JSON(403, gin.H{"error": "failed to find user"})
+		model.ErrorResponse(ctx, http.StatusNotFound, errors.New("user not found"))
 		return
 	}
 
-	if !hasPermission(claims.(*utils.Claims).Role, user.Role) {
-		ctx.JSON(403, gin.H{"error": "no permissions"})
+	if !hasPermission(claims.(*util.Claims).Role, user.Role) {
+		model.ErrorResponse(ctx, 403, errors.New("no permissions"))
 		return
 	}
 
 	if indexOf(roleList, userIn.Role) < 0 {
-		ctx.JSON(403, gin.H{"error": "entries incorrect"})
+		model.ErrorResponse(ctx, 403, errors.New("entries incorrect"))
 		return
 	}
 
-	// 5. 更新用户信息(使用事务)
 	if err := uc.DB.Transaction(func(tx *gorm.DB) error {
 		user.Role = userIn.Role
 		return tx.Save(&user).Error
 	}); err != nil {
-		ctx.JSON(500, gin.H{"error": "Failed to update user"})
+		model.ErrorResponse(ctx, 500, errors.New("failed to update user role: "+err.Error()))
 		return
 	}
 
-	ctx.JSON(200, gin.H{
-		"success": true,
-		"msg":     "user role has changed",
+	model.SuccessResponse(ctx, 200, gin.H{
+		"code":    200,
+		"state":   "success",
+		"message": "user role has changed",
+		"data":    user,
 	})
 }
 
 func (uc *UserController) ChangePassword(ctx *gin.Context) {
-	// 1. 参数绑定与验证
 	var userIn UserPassword
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid request payload"))
 		return
 	}
 
 	user, err := uc.getCurrentUser(ctx)
 	if err != nil {
-		return // 错误已在getCurrentUser中处理
+		return
 	}
 
-	// 5. 更新用户信息(使用事务)
 	if err := uc.DB.Transaction(func(tx *gorm.DB) error {
 		user.Password = userIn.NewPassword
 		return tx.Save(&user).Error
 	}); err != nil {
-		ctx.JSON(500, gin.H{"error": "failed to update password"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("failed to update password: "+err.Error()))
 		return
 	}
 
-	ctx.JSON(200, gin.H{
-		"success": true,
-		"msg":     "password has changed",
+	model.SuccessResponse(ctx, 200, gin.H{
+		"code":    200,
+		"state":   "success",
+		"message": "password has changed",
+		"data":    user,
 	})
 }
 
 func (uc *UserController) ChangeUserinfo(ctx *gin.Context) {
-	// 1. 参数绑定与验证
 	var userIn UserInfo
 	if err := ctx.ShouldBindJSON(&userIn); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request payload"})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid request payload"))
 		return
 	}
 
-	// 2. 获取认证用户
 	user, err := uc.getCurrentUser(ctx)
 	if err != nil {
 		return
 	}
 
-	// 5. 更新用户信息(使用事务)
 	err = uc.DB.Transaction(func(tx *gorm.DB) error {
 		user.Username = userIn.Username
 		user.Email = userIn.Email
@@ -348,13 +351,14 @@ func (uc *UserController) ChangeUserinfo(ctx *gin.Context) {
 		return nil
 	})
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user"})
-		return
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("failed to update userinfo: "+err.Error()))
 	}
 
-	ctx.JSON(200, gin.H{
-		"success": true,
-		"msg":     "userinfo has changed",
+	model.SuccessResponse(ctx, 200, gin.H{
+		"code":    200,
+		"state":   "success",
+		"message": "userinfo has changed",
+		"data":    user,
 	})
 }
 
@@ -362,36 +366,36 @@ func (uc *UserController) DeleteUser(ctx *gin.Context) {
 	// 1. 参数验证
 	id, err := strconv.Atoi(ctx.Param("id"))
 	if err != nil || id <= 0 {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user ID"})
+		model.ErrorResponse(ctx, http.StatusBadRequest, errors.New("invalid user ID"))
 		return
 	}
 
 	// 2. 获取当前用户(用于权限验证)
 	claims, exists := ctx.Get("claims")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not authenticated"})
+		model.ErrorResponse(ctx, http.StatusUnauthorized, errors.New("unauthorization"))
 		return
 	}
 
 	// 3. 检查是否在删除自己
-	if id == int(claims.(*utils.Claims).ID) {
-		ctx.JSON(http.StatusForbidden, gin.H{"error": "Cannot delete yourself"})
+	if id == int(claims.(*util.Claims).ID) {
+		model.ErrorResponse(ctx, http.StatusForbidden, errors.New("could not delete yourself"))
 		return
 	}
 
 	// 4. 查询要删除的用户
-	var user models.User
+	var user model.User
 	if err := uc.DB.First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			model.ErrorResponse(ctx, http.StatusNotFound, errors.New("user not found"))
 		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+			model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		}
 		return
 	}
 
-	if !hasPermission(claims.(*utils.Claims).Role, user.Role) {
-		ctx.JSON(403, gin.H{"error": "no permissions"})
+	if !hasPermission(claims.(*util.Claims).Role, user.Role) {
+		model.ErrorResponse(ctx, http.StatusForbidden, errors.New("no permissions to delete this user"))
 		return
 	}
 
@@ -404,14 +408,16 @@ func (uc *UserController) DeleteUser(ctx *gin.Context) {
 	})
 
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("failed to delete user: "+err.Error()))
 		return
 	}
 
 	// 6. 返回成功响应
-	ctx.JSON(http.StatusOK, gin.H{
-		"success": true,
+	model.SuccessResponse(ctx, 200, gin.H{
+		"code":    200,
+		"state":   "success",
 		"message": "User deleted successfully",
+		"data":    user,
 	})
 }
 
@@ -420,19 +426,20 @@ func (uc *UserController) setupSelect() *gorm.DB {
 		"created_at", "updated_at")
 }
 
-func (uc *UserController) getCurrentUser(ctx *gin.Context) (*models.User, error) {
+func (uc *UserController) getCurrentUser(ctx *gin.Context) (*model.User, error) {
 	claims, exists := ctx.Get("claims")
 	if !exists {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
-		return nil, errors.New("Unauthorization")
+		err := errors.New("unauthorization")
+		model.ErrorResponse(ctx, http.StatusUnauthorized, err)
+		return nil, err
 	}
 
-	var user models.User
-	if err := uc.DB.First(&user, "id = ?", claims.(*utils.Claims).ID).Error; err != nil {
+	var user model.User
+	if err := uc.DB.First(&user, "id = ?", claims.(*util.Claims).ID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+			model.ErrorResponse(ctx, http.StatusNotFound, errors.New("user not found"))
 		} else {
-			ctx.JSON(500, gin.H{"error": "Failed to retrieve user: " + err.Error()})
+			model.ErrorResponse(ctx, http.StatusInternalServerError, errors.New("database error: "+err.Error()))
 		}
 		return nil, err
 	}
@@ -450,7 +457,7 @@ func hasPermission(current, target string) bool {
 }
 
 func getRoleList() []string {
-	rolesStr := utils.Viper.GetString("app.roles")
+	rolesStr := util.Viper.GetString("app.roles")
 	return strings.Split(rolesStr, ",")
 }
 

@@ -1,34 +1,29 @@
-package router
+package app
 
 import (
 	"gin-temp/controller"
-	"gin-temp/utils"
+	"gin-temp/middleware"
+	"gin-temp/util"
 	"io"
-	"log"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/go-playground/validator/v10"
 )
 
-func initApp() *gin.Engine {
-	if !utils.Viper.GetBool("app.debug") {
-		gin.SetMode(gin.ReleaseMode)
+var (
+	handlerFuncListOfAuthAndRbac = []gin.HandlerFunc{
+		middleware.JwtAuthorization(),
+		middleware.CasbinAuthorization(util.Enforcer),
 	}
+
+	userCtrl = &controller.UserController{DB: util.DB}
+)
+
+func initApp() *gin.Engine {
+	util.GinLogger(util.Logger)
 
 	return gin.Default()
-}
-
-func initLog() {
-	gin.DisableConsoleColor()
-
-	f, err := os.Create("gin.log")
-	if err != nil {
-		log.Fatalf("Failed to create log file: %v", err)
-	}
-
-	gin.DefaultWriter = io.MultiWriter(f)
 }
 
 func initValidator() {
@@ -40,6 +35,14 @@ func initValidator() {
 		if err := v.RegisterValidation("username",
 			controller.UsernameValidator); err != nil {
 			panic("failed to register username validator")
+		}
+	}
+}
+
+func CleanUp(closers ...io.Closer) {
+	for _, closer := range closers {
+		if closer != nil {
+			closer.Close()
 		}
 	}
 }
